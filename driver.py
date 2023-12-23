@@ -19,7 +19,7 @@ def main():
         
         If there are chat history, please generate a more complicated code then previously generated code.
         
-        If previous generated code is fail to run, you need to generate runable code this round.
+        If previous generated code is fail to run, you need to generate runable code this round. If output of previous generated code complains that some operation in code is unsupported by SPU runtime or JAX and so on, you need to avoid use them in this round. If output complains ray error, may be we should retry.
 
         Avoid to use any random functions when generating data or perform computation, since it cause us diffcult to reproduce the problem.
 
@@ -28,7 +28,7 @@ def main():
         Template as below:
 
         import secretflow as sf
-        # import necessary libraries here
+        # import libraries if needed
 
         # Initialize SPU and participants
         sf.init(['alice', 'bob'], address='local')
@@ -125,8 +125,14 @@ def main():
             + """
             Please compare their results followed by 'Result:' and ignore information irrelevant to the results.
             
-            Finally, answer 'Same', 'Different' or 'Fail' in the first line, and then explain the reason from the second line. 'Same' means results are the same, 'Different' means results are different, 'Fail' means generated code run with error, it may due to generated code is incomplete or other runtime error, usually when an error occurs, we will find that the output contains error information and even call stack.
+            Finally, answer 'Same', 'Different' or 'Fail' in the first line, and then explain the reason from the second line.
+
+            'Fail' means SPU code run to error or normal code run to error, therefore we cannot obtain the calculation results of both. It may due to generated code is incomplete or other runtime error. Usually when an error occurs, we will find that the output contains error information and even call stack. In SPU code, if output complains that some operation in code is unsupported by SPU runtime or JAX and so on, you need to avoid use them in next round. If output complains ray error, may be we should retry in next round.
             
+            'Different' means we sucessfully obtain calculation results of both, but they are different.
+
+            'Same' means we sucessfully obtain calculation results of both, and they are same.
+
             SPU code can give wrong result compared with normal code, you need to be careful.
             """
         )

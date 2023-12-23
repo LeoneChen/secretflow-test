@@ -2,3 +2,4 @@ seeds
 different
 fail
 .vscode
+*.log
