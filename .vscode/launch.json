@@ -1,0 +1,25 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "driver.py",
+            "type": "python",
+            "request": "launch",
+            "program": "driver.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+        },
+        {
+            "name": "Case",
+            "type": "python",
+            "request": "launch",
+            "program": "fail/5220359dbc50fef082d2db3c5fd3bf6c9390b839a4d18b126df2c82b9e41db76_normal_code.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "stopOnEntry": false
+        },
+    ]
+}
