@@ -13,7 +13,6 @@ def main():
     round = 0
     while True:
         round += 1
-        print(f"========== Round {round} ==========")
         chat = model.start_chat(history=history)
 
         prompt_gen_code = """
@@ -86,7 +85,7 @@ def main():
         ```
         """
 
-        print("========== Request to generate code ==========>>>>>>>>>>")
+        print(f"[Round {round}] ========== Request to generate code ==========>>>>>>>>>>")
 
         for _ in range(0, 5):
             try:
@@ -94,7 +93,7 @@ def main():
             except:
                 time.sleep(1)
                 continue
-        print("<<<<<<<<<<========== Get response ==========")
+        print(f"[Round {round}] <<<<<<<<<<========== Get response ==========")
 
         match = re.search(
             "SPU Code:.*?```python(.*)```.*Normal Code:.*?```python(.*)```",
@@ -175,14 +174,14 @@ def main():
             Notice again that you should answer 'Same', 'Different' or 'Fail' in the first line, and what needs to be compared is the calculation results rather than the calculation process.
             """
         )
-        print("========== Request to compare output ==========>>>>>>>>>>")
+        print(f"[Round {round}] ========== Request to compare output ==========>>>>>>>>>>")
         for _ in range(0, 5):
             try:
                 response = chat.send_message(prompt_cmp_output)
             except:
                 time.sleep(1)
                 continue
-        print("<<<<<<<<<<========== Get response ==========")
+        print(f"[Round {round}] <<<<<<<<<<========== Get response ==========")
 
         history += chat.history[-4:]
         if len(history) > 12:
