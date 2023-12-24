@@ -141,7 +141,7 @@ def main():
             + "Normal code execution stderr:\n"
             + normal_result.stderr.decode()
             + """
-            Please compare their results followed by 'Result:' and ignore information irrelevant to the results.
+            Please compare their results followed by 'Result:'. What you need to compare is the calculation results rather than the calculation process.
             
             Finally, answer 'Same', 'Different' or 'Fail' in the first line, and then explain the reason from the second line.
 
@@ -171,6 +171,8 @@ def main():
                 (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
                 (SPURuntime pid=1816700) 2023-12-24 21:48:52.532 [info] [default_brpc_retry_policy.cc:DoRetry:69] not retry for reached rcp timeout, ErrorCode '1008', error msg '[E1008]Reached timeout=2000ms @127.0.0.1:32921'
             ```
+
+            Notice again that you should answer 'Same', 'Different' or 'Fail' in the first line, and what needs to be compared is the calculation results rather than the calculation process.
             """
         )
         print("========== Request to compare output ==========>>>>>>>>>>")
@@ -188,8 +190,11 @@ def main():
         print("len(history)=%d" % len(history))
 
         match = re.match(r"(.*)?\n", response.text)
-        first_line = match.group(1)
-        result = first_line.lower()
+        if match:
+            first_line = match.group(1)
+            result = first_line.lower()
+        else:
+            result = response.text
 
         if result not in ("same", "fail", "different"):
             result = "unknown"
