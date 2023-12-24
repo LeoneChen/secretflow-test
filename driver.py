@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import hashlib
 import subprocess
 import google.generativeai as genai
@@ -9,21 +10,26 @@ def main():
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
     model = genai.GenerativeModel("gemini-pro")
     history = []
+    round = 0
     while True:
+        round += 1
+        print(f"========== Round {round} ==========")
         chat = model.start_chat(history=history)
 
-        prompt = """
+        prompt_gen_code = """
         Imagine that you are an experienced programmer writing test code for the Secure Processing Unit of Secretflow.
         
         You mainly need to provide specific functions of privacy computation in 'func', and provide data of alice and bob in 'get_alice_data' and 'get_bob_data' respectively.
         
         If there are chat history, please generate a more complicated code then previously generated code.
         
-        If previous generated code is fail to run, you need to generate runable code this round. If output of previous generated code complains that some operation in code is unsupported by SPU runtime or JAX and so on, you need to avoid use them in this round. If output complains ray error, may be we should retry.
+        If previous generated code is fail to run, you need to generate runable code this round. If output of previous generated code complains that some operation in code is unsupported, sentence is like 'This is because the SPU compiler does not support the `xxx` operation.', you need to avoid use them in this round. If output complains ray error, may be we should retry.
 
         Avoid to use any random functions when generating data or perform computation, since it cause us diffcult to reproduce the problem.
 
         The generated code need to import necessary libraries in case the code fails to run.
+
+        'secretflow' library only provide functionality like SPU, not others. 
         
         Template as below:
 
@@ -61,7 +67,9 @@ def main():
         # Clean envionment
         sf.shutdown()
 
-        What's more, you should generate another python code, which perform same computation but in normal mode (non-SPU mode).
+        What's more, you should generate another python code, which perform same computation but in normal mode (non-SPU mode), this means code in 'func', 'get_alice_data', and 'get_bob_data' should almost at the same.
+
+        In SPU code, prefer using jax.numpy instead of numpy, while in normal code prefer using numpy instead of jax.numpy.
 
         Response's format is like that:
 
@@ -76,7 +84,15 @@ def main():
         ```
         """
 
-        response = chat.send_message(prompt)
+        print("========== Request to generate code ==========>>>>>>>>>>")
+
+        for _ in range(0, 5):
+            try:
+                response = chat.send_message(prompt_gen_code)
+            except:
+                time.sleep(1)
+                continue
+        print("<<<<<<<<<<========== Get response ==========")
 
         match = re.search(
             "SPU Code:.*?```python(.*)```.*Normal Code:.*?```python(.*)```",
@@ -113,7 +129,7 @@ def main():
             capture_output=True,
         )
 
-        prompt = (
+        prompt_cmp_output = (
             "SPU code execution stdout:\n"
             + spu_result.stdout.decode()
             + "SPU code execution stderr:\n"
@@ -127,7 +143,7 @@ def main():
             
             Finally, answer 'Same', 'Different' or 'Fail' in the first line, and then explain the reason from the second line.
 
-            'Fail' means SPU code run to error or normal code run to error, therefore we cannot obtain the calculation results of both. It may due to generated code is incomplete or other runtime error. Usually when an error occurs, we will find that the output contains error information and even call stack. In SPU code, if output complains that some operation in code is unsupported by SPU runtime or JAX and so on, you need to avoid use them in next round. If output complains ray error, may be we should retry in next round.
+            'Fail' means SPU code run to error or normal code run to error, therefore we cannot obtain the calculation results of both. It may due to generated code is incomplete or other runtime error. Usually when an error occurs, we will find that the output contains error information and even call stack. In SPU code, if output complains that some operation in code is unsupported, sentence is like 'This is because the SPU compiler does not support the `xxx` operation.', you need to avoid use them in next round. If output complains ray error, may be we should retry in next round.
             
             'Different' means we sucessfully obtain calculation results of both, but they are different.
 
@@ -136,42 +152,42 @@ def main():
             SPU code can give wrong result compared with normal code, you need to be careful.
             """
         )
-        response = chat.send_message(prompt)
+        print("========== Request to compare output ==========>>>>>>>>>>")
+        for _ in range(0, 5):
+            try:
+                response = chat.send_message(prompt_cmp_output)
+            except:
+                time.sleep(1)
+                continue
+        print("<<<<<<<<<<========== Get response ==========")
 
         history += chat.history[-4:]
-        if len(history) > 40:
+        if len(history) > 12:
             history = history[4:]
+        print("len(history)=%d" % len(history))
 
         match = re.match(r"(.*)?\n", response.text)
         first_line = match.group(1)
-        if first_line.lower() == "same":
-            continue
-        elif first_line.lower() == "different":
-            os.makedirs("different", exist_ok=True)
-            os.rename(
-                os.path.join("seeds", spu_code_file_name),
-                os.path.join("different", spu_code_file_name),
+        result = first_line.lower()
+
+        if result not in ("same", "fail", "different"):
+            result = "unknown"
+
+        os.makedirs(result, exist_ok=True)
+        os.rename(
+            os.path.join("seeds", spu_code_file_name),
+            os.path.join(result, spu_code_file_name),
+        )
+        os.rename(
+            os.path.join("seeds", normal_code_file_name),
+            os.path.join(result, normal_code_file_name),
+        )
+        print(os.path.join(result, spu_code_file_name))
+
+        if result != "same":
+            print(
+                "Compare output:\n" + prompt_cmp_output + "Response:\n" + response.text
             )
-            os.rename(
-                os.path.join("seeds", normal_code_file_name),
-                os.path.join("different", normal_code_file_name),
-            )
-            print(os.path.join("different", spu_code_file_name))
-            print(response.text)
-        elif first_line.lower() == "fail":
-            os.makedirs("fail", exist_ok=True)
-            os.rename(
-                os.path.join("seeds", spu_code_file_name),
-                os.path.join("fail", spu_code_file_name),
-            )
-            os.rename(
-                os.path.join("seeds", normal_code_file_name),
-                os.path.join("fail", normal_code_file_name),
-            )
-            print(os.path.join("fail", spu_code_file_name))
-            print(response.text)
-        else:
-            raise Exception("Unknown response")
 
 
 if __name__ == "__main__":
