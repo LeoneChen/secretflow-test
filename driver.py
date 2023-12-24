@@ -115,7 +115,7 @@ def main():
 
         spu_result = subprocess.run(
             [
-                "/home/chenliheng/anaconda3/envs/secretflow/bin/python3.8",
+                "/home/leone/anaconda3/envs/secretflow/bin/python3.8",
                 os.path.join("seeds", spu_code_file_name),
             ],
             capture_output=True,
@@ -123,7 +123,7 @@ def main():
 
         normal_result = subprocess.run(
             [
-                "/home/chenliheng/anaconda3/envs/secretflow/bin/python3.8",
+                "/home/leone/anaconda3/envs/secretflow/bin/python3.8",
                 os.path.join("seeds", normal_code_file_name),
             ],
             capture_output=True,
@@ -150,6 +150,25 @@ def main():
             'Same' means we sucessfully obtain calculation results of both, and they are same.
 
             SPU code can give wrong result compared with normal code, you need to be careful.
+
+            When comparing outputs, ignore complaints like (since device may not have GPU/TPU, so falling back to CPU is OK):
+            ```shell
+                INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+                INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+                INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': INVALID_ARGUMENT: TpuPlatform is not available.
+                INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
+                WARNING:jax._src.xla_bridge:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+            ```
+
+            When comparing outputs, ignore complaints like below from SPURuntime (it's irrelevant to the result of computation):
+            ```shell
+                (SPURuntime pid=1816702) 2023-12-24 21:48:50.413 [info] [default_brpc_retry_policy.cc:DoRetry:52] socket error, sleep=1000000us and retry
+                (SPURuntime pid=1816702) 2023-12-24 21:48:51.413 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:38701} (0x0x48e4a80): Connection refused [R1][E112]Not connected to 127.0.0.1:38701 yet, server_id=0'
+                (SPURuntime pid=1816702) 2023-12-24 21:48:51.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
+                (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:38701} (0x0x48e4a80): Connection refused [R1][E112]Not connected to 127.0.0.1:38701 yet, server_id=0 [R2][E112]Not connected to 127.0.0.1:38701 yet, server_id=0'
+                (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
+                (SPURuntime pid=1816700) 2023-12-24 21:48:52.532 [info] [default_brpc_retry_policy.cc:DoRetry:69] not retry for reached rcp timeout, ErrorCode '1008', error msg '[E1008]Reached timeout=2000ms @127.0.0.1:32921'
+            ```
             """
         )
         print("========== Request to compare output ==========>>>>>>>>>>")
@@ -186,7 +205,10 @@ def main():
 
         if result != "same":
             print(
-                "Compare output:\n" + prompt_cmp_output + "Response:\n" + response.text
+                "Compare output:\n"
+                + prompt_cmp_output
+                + "\nResponse:\n"
+                + response.text
             )
 
 

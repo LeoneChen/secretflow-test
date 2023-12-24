@@ -8,7 +8,7 @@
             "name": "Case",
             "type": "python",
             "request": "launch",
-            "program": "fail/26a131c0ca19cc6e8caf709781418e675b7733a1bb6859f6981751b07a9af3a7_spu_code.py",
+            "program": "fail/2473d4816b25e762448e6fab574414c2c9343ac0eee3ff0b1d8201ea10d92505_normal_code.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "stopOnEntry": true
