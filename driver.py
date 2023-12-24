@@ -70,7 +70,7 @@ def main():
 
         In SPU code, prefer using jax.numpy instead of numpy, while in normal code prefer using numpy instead of jax.numpy.
 
-        When generating SPU code, in `func`, `spu_node_device.xxx` is not allowed, since `spu_node_device` is an SPU node device, it shouldn't appear in private computation.
+        When generating SPU code, in `func`, 'get_alice_data', and 'get_bob_data', the code must have nothing to do with secretflow and spu.
 
         Response's format is like that:
 
@@ -85,8 +85,9 @@ def main():
         ```
         """
 
-        print(f"[Round {round}] ========== Request to generate code ==========>>>>>>>>>>")
-
+        print(
+            f"[Round {round}] ========== Request to generate code ==========>>>>>>>>>>"
+        )
         for _ in range(0, 5):
             try:
                 response = chat.send_message(prompt_gen_code)
@@ -95,127 +96,144 @@ def main():
                 continue
         print(f"[Round {round}] <<<<<<<<<<========== Get response ==========")
 
-        match = re.search(
+        match_code = re.search(
             "SPU Code:.*?```python(.*)```.*Normal Code:.*?```python(.*)```",
             response.text,
             re.DOTALL,
         )
 
-        spu_code = match.group(1)
-        spu_code_hash = hashlib.sha256(spu_code.encode()).hexdigest()
-        spu_code_file_name = str(spu_code_hash) + "_spu_code.py"
-        os.makedirs("seeds", exist_ok=True)
-        with open(os.path.join("seeds", spu_code_file_name), "w") as f:
-            f.write(spu_code)
+        round_history = chat.history[-2:]
+        round_chat = model.start_chat(history=round_history)
 
-        normal_code = match.group(2)
-        # normal_code_hash = hashlib.sha256(normal_code.encode()).hexdigest()
-        normal_code_file_name = str(spu_code_hash) + "_normal_code.py"
-        with open(os.path.join("seeds", normal_code_file_name), "w") as f:
-            f.write(normal_code)
+        if match_code:
+            spu_code = match_code.group(1)
+            spu_code_hash = hashlib.sha256(spu_code.encode()).hexdigest()
+            spu_code_file_name = str(spu_code_hash) + "_spu_code.py"
+            os.makedirs("seeds", exist_ok=True)
+            with open(os.path.join("seeds", spu_code_file_name), "w") as f:
+                f.write(spu_code)
 
-        spu_result = subprocess.run(
-            [
-                "/home/leone/anaconda3/envs/secretflow/bin/python3.8",
+            normal_code = match_code.group(2)
+            # normal_code_hash = hashlib.sha256(normal_code.encode()).hexdigest()
+            normal_code_file_name = str(spu_code_hash) + "_normal_code.py"
+            with open(os.path.join("seeds", normal_code_file_name), "w") as f:
+                f.write(normal_code)
+
+            spu_result = subprocess.run(
+                [
+                    "/home/leone/anaconda3/envs/secretflow/bin/python3.8",
+                    os.path.join("seeds", spu_code_file_name),
+                ],
+                capture_output=True,
+            )
+
+            normal_result = subprocess.run(
+                [
+                    "/home/leone/anaconda3/envs/secretflow/bin/python3.8",
+                    os.path.join("seeds", normal_code_file_name),
+                ],
+                capture_output=True,
+            )
+
+            prompt_cmp_output = (
+                "SPU code execution stdout:\n"
+                + spu_result.stdout.decode()
+                + "SPU code execution stderr:\n"
+                + spu_result.stderr.decode()
+                + "Normal code execution stdout:\n"
+                + normal_result.stdout.decode()
+                + "Normal code execution stderr:\n"
+                + normal_result.stderr.decode()
+                + """
+                Please compare their results followed by 'Result:'. What you need to compare is the calculation results rather than the calculation process.
+                
+                Finally, answer 'Same', 'Different' or 'Fail' in the first line, and then explain the reason from the second line.
+
+                'Fail' means SPU code run to error or normal code run to error, therefore we cannot obtain the calculation results of both. It may due to generated code is incomplete or other runtime error. Usually when an error occurs, we will find that the output contains error information and even call stack. In SPU code, if output complains that some operation in code is unsupported, sentence is like 'This is because the SPU compiler does not support the `xxx` operation.', you need to avoid use them in next round. If output complains ray error, may be we should retry in next round.
+                
+                'Different' means we sucessfully obtain calculation results of both, but they are different.
+
+                'Same' means we sucessfully obtain calculation results of both, and they are same.
+
+                SPU code can give wrong result compared with normal code, you need to be careful.
+
+                When comparing outputs, ignore complaints like (since device may not have GPU/TPU, so falling back to CPU is OK):
+                ```shell
+                    INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+                    INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+                    INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': INVALID_ARGUMENT: TpuPlatform is not available.
+                    INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
+                    WARNING:jax._src.xla_bridge:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+                ```
+
+                When comparing outputs, ignore complaints like below from SPURuntime (it's irrelevant to the result of computation):
+                ```shell
+                    (SPURuntime pid=1816702) 2023-12-24 21:48:50.413 [info] [default_brpc_retry_policy.cc:DoRetry:52] socket error, sleep=1000000us and retry
+                    (SPURuntime pid=1816702) 2023-12-24 21:48:51.413 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:38701} (0x0x48e4a80): Connection refused [R1][E112]Not connected to 127.0.0.1:38701 yet, server_id=0'
+                    (SPURuntime pid=1816702) 2023-12-24 21:48:51.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
+                    (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:38701} (0x0x48e4a80): Connection refused [R1][E112]Not connected to 127.0.0.1:38701 yet, server_id=0 [R2][E112]Not connected to 127.0.0.1:38701 yet, server_id=0'
+                    (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
+                    (SPURuntime pid=1816700) 2023-12-24 21:48:52.532 [info] [default_brpc_retry_policy.cc:DoRetry:69] not retry for reached rcp timeout, ErrorCode '1008', error msg '[E1008]Reached timeout=2000ms @127.0.0.1:32921'
+                ```
+
+                Notice again that you should answer 'Same', 'Different' or 'Fail' in the first line, and what needs to be compared is the calculation results rather than the calculation process.
+                """
+            )
+
+            print(
+                f"[Round {round}] ========== Request to compare output ==========>>>>>>>>>>"
+            )
+            for _ in range(0, 5):
+                try:
+                    response = round_chat.send_message(prompt_cmp_output)
+                except:
+                    time.sleep(1)
+                    continue
+            print(f"[Round {round}] <<<<<<<<<<========== Get response ==========")
+
+            match = re.match(r"(.*?)\n", response.text)
+            if match:
+                first_line = match.group(1)
+                result = first_line.lower()
+            else:
+                result = response.text.lower()
+
+            if result not in ("same", "fail", "different"):
+                result = "unknown"
+
+            os.makedirs(result, exist_ok=True)
+            os.rename(
                 os.path.join("seeds", spu_code_file_name),
-            ],
-            capture_output=True,
-        )
-
-        normal_result = subprocess.run(
-            [
-                "/home/leone/anaconda3/envs/secretflow/bin/python3.8",
+                os.path.join(result, spu_code_file_name),
+            )
+            os.rename(
                 os.path.join("seeds", normal_code_file_name),
-            ],
-            capture_output=True,
-        )
+                os.path.join(result, normal_code_file_name),
+            )
+            print(os.path.join(result, spu_code_file_name))
 
-        prompt_cmp_output = (
-            "SPU code execution stdout:\n"
-            + spu_result.stdout.decode()
-            + "SPU code execution stderr:\n"
-            + spu_result.stderr.decode()
-            + "Normal code execution stdout:\n"
-            + normal_result.stdout.decode()
-            + "Normal code execution stderr:\n"
-            + normal_result.stderr.decode()
-            + """
-            Please compare their results followed by 'Result:'. What you need to compare is the calculation results rather than the calculation process.
-            
-            Finally, answer 'Same', 'Different' or 'Fail' in the first line, and then explain the reason from the second line.
+            if result != "same":
+                print(
+                    "Compare output:\n"
+                    + prompt_cmp_output
+                    + "\nResponse:\n"
+                    + response.text
+                )
+        else:
+            print(
+                f"[Round {round}] ========== Feedback problem with response format ==========>>>>>>>>>>"
+            )
+            for _ in range(0, 5):
+                try:
+                    response = round_chat.send_message("You give wrong response format")
+                except:
+                    time.sleep(1)
+                    continue
+            print(f"[Round {round}] <<<<<<<<<<========== Get response ==========")
 
-            'Fail' means SPU code run to error or normal code run to error, therefore we cannot obtain the calculation results of both. It may due to generated code is incomplete or other runtime error. Usually when an error occurs, we will find that the output contains error information and even call stack. In SPU code, if output complains that some operation in code is unsupported, sentence is like 'This is because the SPU compiler does not support the `xxx` operation.', you need to avoid use them in next round. If output complains ray error, may be we should retry in next round.
-            
-            'Different' means we sucessfully obtain calculation results of both, but they are different.
-
-            'Same' means we sucessfully obtain calculation results of both, and they are same.
-
-            SPU code can give wrong result compared with normal code, you need to be careful.
-
-            When comparing outputs, ignore complaints like (since device may not have GPU/TPU, so falling back to CPU is OK):
-            ```shell
-                INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
-                INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
-                INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': INVALID_ARGUMENT: TpuPlatform is not available.
-                INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
-                WARNING:jax._src.xla_bridge:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
-            ```
-
-            When comparing outputs, ignore complaints like below from SPURuntime (it's irrelevant to the result of computation):
-            ```shell
-                (SPURuntime pid=1816702) 2023-12-24 21:48:50.413 [info] [default_brpc_retry_policy.cc:DoRetry:52] socket error, sleep=1000000us and retry
-                (SPURuntime pid=1816702) 2023-12-24 21:48:51.413 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:38701} (0x0x48e4a80): Connection refused [R1][E112]Not connected to 127.0.0.1:38701 yet, server_id=0'
-                (SPURuntime pid=1816702) 2023-12-24 21:48:51.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
-                (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:38701} (0x0x48e4a80): Connection refused [R1][E112]Not connected to 127.0.0.1:38701 yet, server_id=0 [R2][E112]Not connected to 127.0.0.1:38701 yet, server_id=0'
-                (SPURuntime pid=1816702) 2023-12-24 21:48:52.414 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
-                (SPURuntime pid=1816700) 2023-12-24 21:48:52.532 [info] [default_brpc_retry_policy.cc:DoRetry:69] not retry for reached rcp timeout, ErrorCode '1008', error msg '[E1008]Reached timeout=2000ms @127.0.0.1:32921'
-            ```
-
-            Notice again that you should answer 'Same', 'Different' or 'Fail' in the first line, and what needs to be compared is the calculation results rather than the calculation process.
-            """
-        )
-        print(f"[Round {round}] ========== Request to compare output ==========>>>>>>>>>>")
-        for _ in range(0, 5):
-            try:
-                response = chat.send_message(prompt_cmp_output)
-            except:
-                time.sleep(1)
-                continue
-        print(f"[Round {round}] <<<<<<<<<<========== Get response ==========")
-
-        history += chat.history[-4:]
+        history += round_chat.history
         if len(history) > 12:
             history = history[4:]
-        print("len(history)=%d" % len(history))
-
-        match = re.match(r"(.*)?\n", response.text)
-        if match:
-            first_line = match.group(1)
-            result = first_line.lower()
-        else:
-            result = response.text
-
-        if result not in ("same", "fail", "different"):
-            result = "unknown"
-
-        os.makedirs(result, exist_ok=True)
-        os.rename(
-            os.path.join("seeds", spu_code_file_name),
-            os.path.join(result, spu_code_file_name),
-        )
-        os.rename(
-            os.path.join("seeds", normal_code_file_name),
-            os.path.join(result, normal_code_file_name),
-        )
-        print(os.path.join(result, spu_code_file_name))
-
-        if result != "same":
-            print(
-                "Compare output:\n"
-                + prompt_cmp_output
-                + "\nResponse:\n"
-                + response.text
-            )
 
 
 if __name__ == "__main__":
