@@ -39,7 +39,7 @@ def main():
         # Initialize SPU and participants
         sf.init(['alice', 'bob'], address='local')
         alice, bob = sf.PYU('alice'), sf.PYU('bob')
-        spu = sf.SPU(sf.utils.testing.cluster_def(['alice', 'bob']))
+        spu_node_device = sf.SPU(sf.utils.testing.cluster_def(['alice', 'bob']))
 
         # Specific functions that need to be generated
         def func(data_alice, data_bob):
@@ -56,7 +56,7 @@ def main():
         data_bob = bob(get_bob_data)()
 
         # Perform privacy computation on SPU
-        result = spu(func)(data_alice, data_bob)
+        result = spu_node_device(func)(data_alice, data_bob)
 
         # Reveal results
         revealed_result = sf.reveal(result)
@@ -70,6 +70,8 @@ def main():
         What's more, you should generate another python code, which perform same computation but in normal mode (non-SPU mode), this means code in 'func', 'get_alice_data', and 'get_bob_data' should almost at the same.
 
         In SPU code, prefer using jax.numpy instead of numpy, while in normal code prefer using numpy instead of jax.numpy.
+
+        When generating SPU code, in `func`, `spu_node_device.xxx` is not allowed, since `spu_node_device` is an SPU node device, it shouldn't appear in private computation.
 
         Response's format is like that:
 
