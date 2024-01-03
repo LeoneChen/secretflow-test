@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: starcoder_test",
+            "type": "python",
+            "request": "launch",
+            "program": "starcoder_test.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Case",
             "type": "python",
             "request": "launch",
