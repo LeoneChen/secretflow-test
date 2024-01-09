@@ -468,8 +468,8 @@ Result: 15
 
 The reason why different is that both of SPU code and normal code work fine firstly, but result of SPU code is 14, while result of normal code is 15.
 
-##### Same Example ######
-[Same Example: SPU Code]
+##### Same Example 1 ######
+[Same Example 1: SPU Code]
 ```python
 import secretflow as sf
 
@@ -509,7 +509,7 @@ print(f"Result: {revealed_result}")
 # Clean envionment
 sf.shutdown()
 ```
-[Same Example: Execution result of SPU code ]
+[Same Example 1: Execution result of SPU code ]
 ```shell
 2024-01-09 20:49:18,925 INFO worker.py:1538 -- Started a local Ray instance.
 (_run pid=1861) INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
@@ -531,7 +531,7 @@ sf.shutdown()
 Result: 15
 ```
 
-[Same Example: Normal code ]
+[Same Example 1: Normal code ]
 ```python
 # Normal computation function
 def func(data_alice, data_bob):
@@ -559,12 +559,121 @@ result = func(data_alice, data_bob)
 print(f"Result: {result}")
 ```
 
-[Same Example: Execution result of Normal code ]
+[Same Example 1: Execution result of Normal code ]
 ```shell
 Result: 15
 ```
 
-The reason why different is that both of SPU code and normal code work fine firstly, and both results of SPU code and normal code are 15, they are same.
+The reason why same is that both of SPU code and normal code work fine firstly, and both results of SPU code and normal code are 15, they are same.
+
+##### Same Example 2 ######
+[Same Example 2: SPU Code]
+```python
+import secretflow as sf
+import jax.numpy as jnp
+
+# Initialize SPU and participants
+sf.init(['alice', 'bob'], address='local')
+alice, bob = sf.PYU('alice'), sf.PYU('bob')
+spu_node_device = sf.SPU(sf.utils.testing.cluster_def(['alice', 'bob']))
+
+def func(data_alice, data_bob):
+    # Assume we're calculating the mean of data from Alice and Bob
+    total = jnp.concatenate([data_alice, data_bob])
+    mean = total.mean()
+    return mean
+
+def get_alice_data():
+    # Assume Alice data is a list of numbers
+    data_alice = jnp.array([1, 2, 3, 4, 5])
+    return data_alice
+
+def get_bob_data():
+    # Assume Bob data is a list of numbers
+    data_bob = jnp.array([6, 7, 8, 9, 10])
+    return data_bob
+
+# Pass data to PYU
+data_alice = alice(get_alice_data)()
+data_bob = bob(get_bob_data)()
+
+# Perform privacy computation on SPU
+result = spu_node_device(func)(data_alice, data_bob)
+
+# Reveal results
+revealed_result = sf.reveal(result)
+
+# Print revealed result
+print(f"Result: {revealed_result}")
+
+# Clean envionment
+sf.shutdown()
+```
+
+[Same Example 2: Execution Result of SPU Code]
+```shell
+2024-01-09 21:13:10,986 INFO worker.py:1538 -- Started a local Ray instance.
+INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': INVALID_ARGUMENT: TpuPlatform is not available.
+INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
+WARNING:jax._src.xla_bridge:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+(_run pid=57962) INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+(_run pid=57962) INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+(_run pid=57962) INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': INVALID_ARGUMENT: TpuPlatform is not available.
+(_run pid=57962) INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
+(_run pid=57962) WARNING:jax._src.xla_bridge:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+(_run pid=60098) INFO:jax._src.xla_bridge:Unable to initialize backend 'cuda': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+(_run pid=60098) INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
+(_run pid=60098) INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': INVALID_ARGUMENT: TpuPlatform is not available.
+(_run pid=60098) INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
+(_run pid=60098) WARNING:jax._src.xla_bridge:No GPU/TPU found, falling back to CPU. (Set TF_CPP_MIN_LOG_LEVEL=0 and rerun for more info.)
+(SPURuntime pid=11547) 2024-01-09 21:13:15.540 [info] [default_brpc_retry_policy.cc:DoRetry:52] socket error, sleep=1000000us and retry
+(SPURuntime pid=11547) 2024-01-09 21:13:16.541 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:54063} (0x0x5fc31dd15640): Connection refused [R1][E112]Not connected to 127.0.0.1:54063 yet, server_id=0'
+(SPURuntime pid=11547) 2024-01-09 21:13:16.541 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
+(SPURuntime pid=11547) 2024-01-09 21:13:17.541 [info] [default_brpc_retry_policy.cc:LogHttpDetail:29] cntl ErrorCode '112', http status code '200', response header '', error msg '[E111]Fail to connect Socket{id=0 addr=127.0.0.1:54063} (0x0x5fc31dd15640): Connection refused [R1][E112]Not connected to 127.0.0.1:54063 yet, server_id=0 [R2][E112]Not connected to 127.0.0.1:54063 yet, server_id=0'
+(SPURuntime pid=11547) 2024-01-09 21:13:17.541 [info] [default_brpc_retry_policy.cc:DoRetry:75] aggressive retry, sleep=1000000us and retry
+(SPURuntime pid=11794) 2024-01-09 21:13:18.092 [info] [default_brpc_retry_policy.cc:DoRetry:69] not retry for reached rcp timeout, ErrorCode '1008', error msg '[E1008]Reached timeout=2000ms @127.0.0.1:56991'
+Result: 5.499999523162842
+```
+
+[Same Example 2: Normal Code]
+```python
+import numpy as np
+
+def func(data_alice, data_bob):
+    # Assume we're calculating the mean of data from Alice and Bob
+    total = np.concatenate([data_alice, data_bob])
+    mean = total.mean()
+    return mean
+
+def get_alice_data():
+    # Assume Alice data is a list of numbers
+    data_alice = np.array([1, 2, 3, 4, 5])
+    return data_alice
+
+def get_bob_data():
+    # Assume Bob data is a list of numbers
+    data_bob = np.array([6, 7, 8, 9, 10])
+    return data_bob
+
+# Get data
+data_alice = get_alice_data()
+data_bob = get_bob_data()
+
+# Perform normal computation
+result = func(data_alice, data_bob)
+
+# Print result
+print(f"Result: {result}")
+```
+
+[Same Example 2: Execution Result of Normal Code]
+```shell
+Result: 5.5
+```
+
+The reason why same is that both of SPU code and normal code work fine firstly, and results of SPU code is 5.499999523162842 and results of normal code are 5.5. In floating point arithmetic, 5.499999523162842 and 5.5 are almost same and the difference is so small.
 """
 
 
