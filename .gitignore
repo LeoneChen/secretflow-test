@@ -1,7 +1,5 @@
 seeds
-different
 same
-fail
 unknown
 *.log
 nohup.out
