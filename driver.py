@@ -391,7 +391,7 @@ def main():
         )
         spu_result = result_match.group(1) if result_match else "NO_RESULT"
         if not result_match:
-            while len(error_cases) >= 2:
+            while len(error_cases) >= 1:
                 error_cases.pop(0)
             error_lines = [
                 line
@@ -437,7 +437,10 @@ def main():
         result_file_name = str(spu_code_hash) + "_result.py"
         os.makedirs(result, exist_ok=True)
         with open(os.path.join(result, result_file_name), "w") as f:
-            f.write(f"{all_output}\n{response}")
+            f.write(f"{all_output}\n{response}\n"
+                    f"{os.path.abspath(os.path.join("seeds", spu_code_file_name))}\n"
+                    f"{os.path.abspath(os.path.join("seeds", normal_code_file_name))}\n"
+                    f"Communication Bytes: {spu_comm}")
         print(os.path.join(result, result_file_name))
         print(os.path.join("seeds", spu_code_file_name))
         print(os.path.join("seeds", normal_code_file_name))
