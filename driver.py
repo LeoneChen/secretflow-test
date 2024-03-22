@@ -61,39 +61,50 @@ sf.shutdown()
 
 SAMPLE_SPU_CODE = """
 import secretflow as sf
+import jax.numpy as jnp
 
 # Initialize secretflow framework, SPU node and participants' PYU nodes
-sf.init(['alice', 'bob'], address='local')
-alice, bob = sf.PYU('alice'), sf.PYU('bob')
-spu_node_device = sf.SPU(sf.utils.testing.cluster_def(['alice', 'bob']))
+sf.init(["alice", "bob"], address="local")
+alice, bob = sf.PYU("alice"), sf.PYU("bob")
+spu_node_device = sf.SPU(sf.utils.testing.cluster_def(["alice", "bob"]))
+
 
 # Computation function
 def func(data_alice, data_bob):
     # Compute the sum of data from alice and bob
-    return jnp.add(data_alice, data_bob)
+    ret = jnp.add(data_alice, data_bob)
+    return ret, jnp.size(ret)
+
 
 # Function to get alice's data
 def get_alice_data():
     # Here alice's data is [10]
     return jnp.array([10])
 
+
 # Function to get bob's data
 def get_bob_data():
     # Here bob's data is [5]
     return jnp.array([5])
+
 
 # Get data from PYU nodes which have data
 data_alice = alice(get_alice_data)()
 data_bob = bob(get_bob_data)()
 
 # Perform privacy preserving computing on SPU node
-result = spu_node_device(func)(data_alice, data_bob)
+result, size = spu_node_device(
+    func,
+    num_returns_policy=sf.device.SPUCompilerNumReturnsPolicy.FROM_USER,
+    user_specified_num_returns=2,
+)(data_alice, data_bob)
 
 # Reveal results
 revealed_result = sf.reveal(result)
+revealed_size = sf.reveal(size)
 
 # Print revealed result
-print("== RESULT BEGIN ==\n%s\n== RESULT END ==" % revealed_result)
+print("== RESULT BEGIN ==\n%s\n%s\n== RESULT END ==" % (revealed_result, revealed_size))
 
 # Clean envionment
 sf.shutdown()
@@ -103,7 +114,8 @@ import numpy as np
 
 def func(data_alice, data_bob):
     # Compute the sum of data from alice and bob
-    return np.add(data_alice, data_bob)
+    ret = np.add(data_alice, data_bob)
+    return ret, np.size(ret)
 
 # Function to get alice's data
 def get_alice_data():
@@ -120,10 +132,10 @@ data_alice = get_alice_data()
 data_bob = get_bob_data()
 
 # Perform normal computation
-result = func(data_alice, data_bob)
+result, size = func(data_alice, data_bob)
 
 # Print result
-print("== RESULT BEGIN ==\n%s\n== RESULT END ==" % result)
+print("== RESULT BEGIN ==\n%s\n%s\n== RESULT END ==" % (result, size))
 """
 RELECT_USE_PYTHON_CODEBLOCK_INSTRUCTION = """
 You have been asked to generate Python code before. However, you gave an unexpected response, you did not use a Python code block to write the response, for example: \n```python\nprint('Hello world!')\n```\n. Now you will get the previous response, use Python code block to give the correct response this time.
