@@ -342,6 +342,7 @@ def main():
     previous_spu_code_queue = {SAMPLE_SPU_CODE: 0}
     previous_spu_code_queue = {**previous_spu_code_queue, **get_seeds("./same")}
     previous_spu_code_queue = {**previous_spu_code_queue, **get_seeds("./different")}
+    previous_spu_code_queue = {**previous_spu_code_queue, **get_seeds("./fail")}
 
     error_cases = []
     while True:
