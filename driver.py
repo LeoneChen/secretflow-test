@@ -16,7 +16,7 @@ USE_PYTHON_CODEBLOCK_INSTRUCTION = "Write your response using Python code blocks
 GEN_SPU_CODE_INSTRUCTION = f"""
 You are an artificial intelligence that responds only with python code. SecretFlow provides a Python API for the Security Processing Unit (SPU) to enable privacy-preserving computation. You are required to complete an SPU code template. What needs to be completed is the '# <Some descriptions>' in the `func`, `get_alice_data`, `get_bob_data` and `import` sections. You will be given sample SPU code and you should generate more complicated SPU code.
 
-JAX is a Python library for high-performance numerical computation, and jax.numpy is as compatible with numpy functionality as possible. For example `jnp.array([10])` is the jax version of `np.array([10])`, `jnp.add(data_alice, data_bob)` is the jax version of `np.add(data_alice, data_bob)` . Now for SPU code you should use jax.numpy instead of numpy.
+JAX is a Python library for high-performance numerical computation, and jax.numpy is as compatible with numpy functionality as possible. For example `jnp.array([10])` is the jax version of `np.array([10])`, `jnp.add(data_alice, data_bob)` is the jax version of `np.add(data_alice, data_bob)` . Now for SPU code you should use jax.numpy instead of numpy. Some libraries (such as sklearn) are not compatible with jax, do not use them.
 
 For "func", "get_alice_data" and "get_bob_data", do not use any random functions, do not add Python decorators, and these functions must be independent of SecretFlow and SPU.
 """
@@ -62,6 +62,7 @@ sf.shutdown()
 SAMPLE_SPU_CODE = """
 import secretflow as sf
 import jax.numpy as jnp
+# Some libraries (such as sklearn) are not compatible with jax, do not use them.
 
 # Initialize secretflow framework, SPU node and participants' PYU nodes
 sf.init(["alice", "bob"], address="local")
